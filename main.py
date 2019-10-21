@@ -8,6 +8,7 @@ Created on Mon Oct 14 10:35:01 2019
 import serial.tools.list_ports
 import serial
 import pygame
+import time
 
 ser = serial.Serial('/dev/ttyUSB0', timeout=1, baudrate=9600, parity='N', stopbits=1, bytesize=8)
 
@@ -25,58 +26,16 @@ def send_and_receive(sendstr):
         busy = False
 
 send_and_receive('VR=4')
-
-
-import pygame
-
-# Define some colors
-BLACK    = (   0,   0,   0)
-WHITE    = ( 255, 255, 255)
-
-# This is a simple class that will help us print to the screen
-# It has nothing to do with the joysticks, just outputting the
-# information.
-class TextPrint:
-    def __init__(self):
-        self.reset()
-        self.font = pygame.font.Font(None, 20)
-
-    def _print(self, screen, textString):
-        textBitmap = self.font.render(textString, True, BLACK)
-        screen.blit(textBitmap, [self.x, self.y])
-        self.y += self.line_height
-        
-    def reset(self):
-        self.x = 10
-        self.y = 10
-        self.line_height = 15
-        
-    def indent(self):
-        self.x += 10
-        
-    def unindent(self):
-        self.x -= 10
     
 pressed=0
 pygame.init()
- 
-# Set the width and height of the screen [width,height]
-size = [500, 700]
-screen = pygame.display.set_mode(size)
 
-pygame.display.set_caption("My Game")
-
-#Loop until the user clicks the close button.
 done = False
-
-# Used to manage how fast the screen updates
-clock = pygame.time.Clock()
-
-# Initialize the joysticks
+v_st=0.1
 pygame.joystick.init()
-    
-# Get ready to print
-textPrint = TextPrint()
+send_and_receive("VR="+str(v_st))
+time.sleep(0.1)
+send_and_receive("DIS=1000")
 
 # -------- Main Program Loop -----------
 while done==False:
@@ -86,56 +45,53 @@ while done==False:
             ser.close()
             done=True # Flag that we are done so we exit this loop
             
-        # Possible joystick actions: JOYAXISMOTION JOYBALLMOTION JOYBUTTONDOWN JOYBUTTONUP JOYHATMOTION
         if event.type == pygame.JOYBUTTONDOWN:
             print("Joystick button pressed.")
         if event.type == pygame.JOYBUTTONUP:
             print("Joystick button released.")
 
-
-    # Get count of joysticks
     joystick_count = pygame.joystick.get_count()
-
-    textPrint._print(screen, "Number of joysticks: {}".format(joystick_count) )
-    textPrint.indent()
     
     joystick = pygame.joystick.Joystick(0)
     joystick.init()
     buttons = joystick.get_numbuttons()
+    value=joystick.get_axis(1)
+    
+    if value>0.0:
+        v=round(abs(value)*v_st*20, 3)
+        send_and_receive("cv "+str(v))
+    elif value == 0.0:
+        send_and_receive("cv "+str(v_st))
+
     if joystick.get_button(4)==1 and joystick.get_button(1)==1 and event.type == pygame.JOYBUTTONDOWN:
-        send_and_receive('MCN')
-        print 1
-        pressed=1
+        if pressed==0:
+            send_and_receive("DIS=-1000")
+            time.sleep(0.05)
+            send_and_receive("VR=1")
+            time.sleep(0.05)
+            send_and_receive('MI')
+            
+            print 1
+            pressed=1
     if joystick.get_button(4)==1 and joystick.get_button(3)==1 and event.type == pygame.JOYBUTTONDOWN:
-        send_and_receive('MCP')
-        print 2                                
-        pressed=1
+        if pressed==0:
+            send_and_receive("DIS=1000")
+            time.sleep(0.05)
+            send_and_receive("VR=1")
+            time.sleep(0.05)
+            send_and_receive('MI')
+            print 2                                
+            pressed=1
 
     if joystick.get_button(4)==1 and joystick.get_button(7)==1 and event.type == pygame.JOYBUTTONDOWN:
         send_and_receive('ALMCLR')
         print 4                                
  
 
-    if pressed==1 and event.type == pygame.JOYBUTTONUP and (joystick.get_button(4)==0 or joystick.get_button(1)==0 or joystick.get_button(2)==0):
-        send_and_receive('SSTOP')
+    if joystick.get_button(4)==0:
+        send_and_receive('HSTOP')
         print 3
         pressed=0
-
+    time.sleep(0.05)
             
-        # Hat switch. All or nothing for direction, not like joysticks.
-        # Value comes back in an array.
-
-
-    # ALL CODE TO DRAW SHOULD GO ABOVE THIS COMMENT
-    
-    # Go ahead and update the screen with what we've drawn.
-    
-    pygame.display.flip()
-
-    # Limit to 20 frames per second
-    clock.tick(20)
-    
-# Close the window and quit.
-# If you forget this line, the program will 'hang'
-# on exit if running from IDLE.
 pygame.quit ()
